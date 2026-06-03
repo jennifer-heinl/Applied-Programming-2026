@@ -25,7 +25,10 @@ def load_emg_data(filename: str):
     """
 
     # TODO: load the pickle file with pandas
-    data = None
+    data = pd.read_pickle(filename)
+    
+    #Print out the data and its keys,.. to get an insight into the pkl file
+    #inspect data 
 
     print("Data structure:")
     print("-" * 50)
@@ -36,12 +39,19 @@ def load_emg_data(filename: str):
     for key in data.keys():
         print(f"- {key}")
     print("-" * 50)
+    
+    #to make it stop at line 34, we use sys.exit()
+    #otherwise it keeps running and causes errors, because we havent fixed the attributes emg_signal or sampling rate yet, they are set to None, which causes an error and lets the programm crash
+    #import sys
+    #sys.exit()
+
+
 
     # TODO: extract the EMG signal
-    emg_signal = None
+    emg_signal = data["biosignal"]
 
     # TODO: extract the sampling rate
-    sampling_rate = None
+    sampling_rate = data["device_information"] ["sampling_frequency"]
 
     print("\nEMG Signal information:")
     print("-" * 50)
@@ -54,6 +64,8 @@ def load_emg_data(filename: str):
     return emg_signal, sampling_rate
 
 
+
+
 def restructure_emg_data(emg_signal: np.ndarray):
     """
     Convert EMG from:
@@ -63,10 +75,10 @@ def restructure_emg_data(emg_signal: np.ndarray):
     """
 
     # TODO: determine the number of channels
-    num_channels = None
+    num_channels = emg_signal.shape[0]
 
     # TODO: transpose and reshape so each row is one continuous channel
-    channel_data = None
+    channel_data = emg_signal.transpose(0, 2, 1).reshape(num_channels, -1)
 
     print("\nRestructured EMG Data:")
     print("-" * 50)
@@ -76,6 +88,8 @@ def restructure_emg_data(emg_signal: np.ndarray):
     print(f"Total samples per channel: {channel_data.shape[1]}")
 
     return channel_data, num_channels
+
+
 
 
 def bandpass_filter_emg(
@@ -89,14 +103,22 @@ def bandpass_filter_emg(
     """
 
     # TODO: compute the Nyquist frequency
-    nyquist = None
+    nyquist = sampling_rate/2
 
     # TODO: validate low_cut and high_cut
     # Raise ValueError if the frequencies are invalid.
+    if low_cut <= 0:
+        raise ValueError("Low cutoff frequency must be greater than 0 Hz.")
+    if high_cut >= nyquist:
+        raise ValueError(
+            f"High cutoff frequency ({high_cut} Hz) exceeds Nyquist frequency ({nyquist} Hz)."
+        )
+    if low_cut >= high_cut:
+        raise ValueError("Low cutoff frequency must be smaller than high cutoff frequency.")
 
     # TODO: normalize the cutoff frequencies
-    low = None
-    high = None
+    low = low_cut/ nyquist
+    high = high_cut/ nyquist
 
     print("\nFilter Design Parameters:")
     print("-" * 50)
@@ -106,13 +128,18 @@ def bandpass_filter_emg(
     print(f"High cutoff: {high_cut} Hz ({high:.4f} normalized)")
 
     # TODO: design a 4th order Butterworth bandpass filter
-    b = None
-    a = None
+    #This does not filter the data yet
+    #It only creates the filter coefficients
+    b, a = signal.butter(4, [low, high], btype = 'bandpass')
 
     # TODO: pre-allocate filtered array
-    filtered_channels = None
+    #creates an empty output array with the same shape as channel_data --> constructed in function restructure emg data
+    filtered_channels = np.zeros_like(channel_data)
 
     # TODO: apply filtfilt to every channel
+    for i in range(channel_data.shape[0]):
+        filtered_channels[i, :] = signal.filtfilt(b, a, channel_data[i, :])
+
 
     print("\nFiltered Signal Information:")
     print("-" * 50)
@@ -129,16 +156,25 @@ def compute_rms(filtered_channels: np.ndarray, sampling_rate: float, window_ms: 
     """
 
     # TODO: convert window size from ms to samples
-    window_size = None
+    #samples = samples_per_second x seconds
+    #and ms (milliseconds) need to be divided by 1000 to have them in seconds 
+    #BUT we need an integer for the window size, so use int()
+    window_size = int(sampling_rate * window_ms/1000)
 
     # TODO: pre-allocate RMS array
-    rms_signals = None
+    rms_signals = np.zeros_like(filtered_channels)
+
+    window = np.ones(window_size) / window_size
 
     # TODO: compute RMS for each channel
     # Hint:
     # 1. square the signal
     # 2. moving average with np.convolve(..., mode="same")
     # 3. square root
+    for c in range(filtered_channels.shape[0]):
+        squared_signal = filtered_channels[c,:] ** 2
+        moving_average = np.convolve(squared_signal, window, mode = "same")
+        rms_signals[c, :] = np.sqrt(moving_average)
 
     print("\nRMS Signal Information:")
     print("-" * 50)
@@ -183,7 +219,7 @@ def plot_emg_processing(
 
 def main():
     # TODO: get the filepath of the pkl file (Use / not \)
-    filename = "recording.pkl"
+    filename = "/Users/jennifer/Desktop/UNI/2.semester/2.Applied_Programming/Applied-Programming-2026/recording.pkl"
 
     emg_signal, sampling_rate = load_emg_data(filename)
     channel_data, _ = restructure_emg_data(emg_signal)
