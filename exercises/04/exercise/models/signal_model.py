@@ -18,6 +18,7 @@ class SignalModel:
         self.t = np.linspace(0, duration, int(sampling_rate * duration), endpoint=False)
 
         # Simulated EMG-like signal: sine + noise
+        #creates the fake EMG-signal
         self.signal = np.sin(0.2 * np.pi * 5 * self.t) + 0.2 * np.random.randn(len(self.t))
 
     def get_window(self, start_idx):

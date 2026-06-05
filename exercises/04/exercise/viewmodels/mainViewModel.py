@@ -16,19 +16,33 @@ class MainViewModel(QObject):
         # - duration=100
         # - window_size=5000
         # - step_size=20
-        self.model = None
+        self.model = SignalModel(
+            sampling_rate = 1000,
+            duration = 100,
+            window_size = 5000,
+            step_size = 20)
+        
+        #could have also created the object shorter like this:
+        #self.model = SignalModel(1000, 100, 5000, 20)
+        # the longer version just makes it more clear and visual and its safer, in case you mix up the order
+        #for the long version, even if the order changes, python still knows  which value belongs where
+
 
         # TODO 2:
         # Initialize:
         # - current_index
         # - is_plotting
-        self.current_index = None
-        self.is_plotting = None
+        self.current_index = 0
+        self.is_plotting = False
+        #those are the start variables/ initial state variables
+        #when ViewModel object is created, python needs to know where do we begin
+        #later the functions further down, change those values
 
         # TODO 3:
         # Create a QTimer and connect its timeout signal
         # to self.update_plot
-        self.timer = None
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_plot)
 
     def start_plotting(self):
         # TODO 4:
@@ -36,7 +50,10 @@ class MainViewModel(QObject):
         # Then:
         # - set is_plotting to True
         # - start the timer with an interval of 10 ms
-        pass
+        if not self.is_plotting:
+            self.is_plotting = True
+            self.timer.start(10)
+
 
     def stop_plotting(self):
         # TODO 5:
@@ -44,7 +61,9 @@ class MainViewModel(QObject):
         # Then:
         # - set is_plotting to False
         # - stop the timer
-        pass
+        if self.is_plotting:
+            self.is_plotting = False 
+            self.timer.stop()
 
     def update_plot(self):
         if not self.model.has_enough_data(self.current_index):

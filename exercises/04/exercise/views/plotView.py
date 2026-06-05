@@ -51,10 +51,25 @@ class VisPyPlotWidget(QWidget):
 
         # TODO 1:
         # Combine x and y into an (N, 2) position array.
-        pos = None
+        #This takes:
+        # x = [x0, x1, x2, ...]
+        # y = [y0, y1, y2, ...]
+        # and turns it into:
+        # pos = [
+        #[x0, y0],
+        #[x1, y1],
+        #[x2, y2],
+        #...
+        #]
+        
+        #N rows  = all signal points
+        #2 cols  = x and y coordinate
+        
+        pos = np.column_stack((x,y))
 
         # TODO 2:
         # Update the line data with the new positions.
+        self.line.set_data(pos=pos)
 
         y_pad = max(0.1, 0.1 * (y.max() - y.min() + 1e-9))
 
@@ -63,3 +78,7 @@ class VisPyPlotWidget(QWidget):
         # Use:
         # - x min/max
         # - y min/max with padding
+        self.view.camera.set_range(
+            x =(x.min(), x.max()),
+            y =(y.min() - y_pad, y.max() + y_pad)
+        )
