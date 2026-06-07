@@ -46,7 +46,7 @@ class TcpClientModel:
 
         self.window_size = int(self.sampling_rate * self.window_seconds)
 
-        self.byte_buffer = bytearray()
+        self.byte_buffer = bytearray() #we ccollect all received bytes here
         self.data_buffer = np.empty((self.channels, 0), dtype=self.dtype)
 
         self.total_samples_received = 0
@@ -62,7 +62,12 @@ class TcpClientModel:
         4. Set the socket to non-blocking mode.
         5. Set self.is_connected to True.
         """
-        pass
+        if self.is_connected:
+            return
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.connect(self.host, self.port)
+        self.socket.setblocking(False)
+        self.is_connected = True
 
     def disconnect(self):
         """
@@ -74,7 +79,11 @@ class TcpClientModel:
            - close the socket
            - set self.socket to None
         """
-        pass
+        self.is_connected = False
+        if self.socket is not None:
+            self.socket.close()
+            self.socket = None
+
 
     def receive_data(self):
         """
@@ -97,14 +106,25 @@ class TcpClientModel:
                 # Receive up to one packet of bytes from the socket.
                 # One packet contains:
                 # channels * samples_per_packet * bytes_per_value bytes.
-                new_bytes = None
+                # for this exercise:
+                # self.packet_size_bytes = 4608
+                # because one EMG packet contains 4608 bytes.
+                new_bytes = self.socket.recv(self.packet_size_bytes)
 
-                if not new_bytes:
+                if not new_bytes: #this means if recv returned empty bytes
                     self.disconnect()
                     return
+                # Why would recv() return empty bytes?
+                # For a TCP socket, this usually means:the other side closed the connection
+                # So if the server disconnects, your client may receive:
+                # new_bytes = b"" --> and then this if code runs
+                # MEANING: The server closed the connection.
+                # So the client should clean up too.
+            
 
                 # TODO:
                 # Add the newly received bytes to self.byte_buffer.
+                self.byte_buffer.extend(new_bytes)
 
             except BlockingIOError:
                 # No more data is available right now.
@@ -115,6 +135,7 @@ class TcpClientModel:
     def _extract_packets_from_buffer(self):
         """
         Convert complete byte packets into NumPy arrays.
+
 
         One complete packet contains:
 
@@ -130,30 +151,34 @@ class TcpClientModel:
 
             576 * 8 = 4608 bytes per packet
         """
+        #he full idea is:
+        #bytes -> NumPy array -> reshape to 32 x 18 -> add to packet list
         packets = []
 
         while len(self.byte_buffer) >= self.packet_size_bytes:
             # TODO:
             # Take one complete packet from the beginning of self.byte_buffer.
-            packet_bytes = None
+            packet_bytes = self.byte_buffer[:self.packet_size_bytes]
 
             # TODO:
             # Delete those bytes from self.byte_buffer,
             # because they are now being processed.
+            del self.byte_buffer[:self.packet_size_bytes]
 
             # TODO:
             # Convert packet_bytes into a NumPy array.
             # Hint:
             # np.frombuffer(..., dtype=self.dtype)
-            packet = None
+            packet = np.frombuffer(packet_bytes,dtype=self.dtype)
 
             # TODO:
             # Reshape the packet into:
             # channels x samples_per_packet
-            packet = None
+            packet = packet.reshape(self.channels, self.samples_per_packet)
 
             # TODO:
             # Add the packet to the list of packets.
+            packet.append(packet)
 
         if len(packets) == 0:
             return
